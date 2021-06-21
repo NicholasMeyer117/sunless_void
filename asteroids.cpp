@@ -289,14 +289,32 @@ std::vector<Sprite> addSpriteToList(std::vector<Sprite> spriteList, Texture *t)
 
 }
 
-bool isCollideWithPlayer(Entity *a,Entity *b)
+bool isCollide(Entity *a,Entity *b)
 {
 
   //dimensions of 
 
-  return (b->x - a->x)*(b->x - a->x)+
-         (b->y - a->y)*(b->y - a->y)<
-         (a->R + b->R)*(a->R + b->R);
+    Vector2f al, ar, bl, br;
+    al.x = (a->sprite.getPosition().x - (a->w)/2);
+    al.y = (a->sprite.getPosition().y + (a->h)/2);
+    
+    ar.x = (a->sprite.getPosition().x + (a->w)/2);
+    ar.y = (a->sprite.getPosition().y - (a->h)/2);
+    
+    bl.x = (b->sprite.getPosition().x - (b->w)/2);
+    bl.y = (b->sprite.getPosition().y + (b->h)/2);
+    
+    br.x = (b->sprite.getPosition().x + (b->w)/2);
+    br.y = (b->sprite.getPosition().y - (b->h)/2);
+    
+    // If one rectangle is on left side of other
+    if (al.x >= br.x or bl.x >= ar.x)
+        return false;
+    // If one rectangle is above other
+    if (al.y <= br.y or bl.y <= ar.y)
+        return false;
+    else
+        return true;
 }
 
 int main() {
@@ -422,10 +440,14 @@ int main() {
    drawText("yPos: " + std::to_string(m->yVel + 400), 20, 90, 140, app);
    drawText("Station xPos: " + std::to_string(station -> x), 20, 90, 10, app);
    drawText("Station yPos: " + std::to_string(station -> y), 20, 90, 40, app);*/
-   drawText("playerPos: " + std::to_string(p->sprite.getPosition().x) + " " + std::to_string(p->sprite.getPosition().y), 20, 90, 50, app);
-   drawText("playerTopL: " + std::to_string(p->sprite.getPosition().x - (p->w)/2) + " PlayerTopR: " + std::to_string(p->sprite.getPosition().y + (p->h)/2), 20, 90, 100, app);
-   drawText("stationPos " + std::to_string(station->sprite.getPosition().x) + " " + std::to_string(station->sprite.getPosition().y), 20, 90, 200, app);
-   //drawText("Bullets Fired: " + std::to_string(bulletsFired), 20, 90, 190, app);
+   //drawText("playerPos: " + std::to_string(p->sprite.getPosition().x) + " " + std::to_string(p->sprite.getPosition().y), 20, 90, 50, app);
+   drawText("playerTopL: " + std::to_string(p->sprite.getPosition().x - (p->w)/2) + ", " + std::to_string(p->sprite.getPosition().y + (p->h)/2), 20, 90, 100, app);
+   drawText("playerBottomR: " + std::to_string(p->sprite.getPosition().x + (p->w)/2) + ", " + std::to_string(p->sprite.getPosition().y - (p->h)/2), 20, 90, 150, app);
+   //drawText("stationPos " + std::to_string(station->sprite.getPosition().x) + " " + std::to_string(station->sprite.getPosition().y), 20, 90, 200, app);
+   drawText("stationTopL " + std::to_string(station->sprite.getPosition().x - (station->w)/2) + ", " + std::to_string(station->sprite.getPosition().y + (station->h)/2), 20, 90, 250, app);
+   drawText("stationBottomR " + std::to_string(station->sprite.getPosition().x + (station->w)/2) + ", " + std::to_string(station->sprite.getPosition().y - (station->h)/2), 20, 90, 300, app);
+   drawText("Overlapping " + std::to_string(isCollide(p, station)), 20, 90, 50, app);
+   
 
    app.display();
    app.clear();
