@@ -101,44 +101,13 @@ class Port: public Entity
 
 };
 
-class Station: public Entity
-{
-
-    string name;
-    std::list<Quest*> quests;
-    std::list<ShopGood*> shopGoods;
-    Port port;
-    
-    void createStation(Sprite &Image,int X,int Y, int W, int H, string Name, std::list<Quest*> Quests, std::list<ShopGood*> ShopGoods, Port ThisPort)
-   {
-     port = ThisPort;
-     shopGoods = ShopGoods;
-     quests = Quests;
-     name = Name;
-     sprite = Image;
-     x=X; y=Y;
-     w = W; h = H;
-   }
-};
-
-
-bool isCollideWithPlayer(Entity *a,Entity *b)
-{
-
-  //dimensions of 
-
-  return (b->x - a->x)*(b->x - a->x)+
-         (b->y - a->y)*(b->y - a->y)<
-         (a->R + b->R)*(a->R + b->R);
-}
-
 class TileMap : public sf::Drawable, public sf::Transformable
 {
 public:
 bool thrust = false;
 bool backThrust = false;
 bool beganThrust = false;
-float xVel,yVel,dx,dy, xDir, yDir, xSpeed, ySpeed, R,angle, maxSpeed, curSpeed, accelerationRate;
+float xVel,yVel,dx,dy, xDir, yDir, xPos, yPos, xSpeed, ySpeed, R,angle, maxSpeed, curSpeed, accelerationRate;
 
     void resetMap()
     {
@@ -197,10 +166,10 @@ float xVel,yVel,dx,dy, xDir, yDir, xSpeed, ySpeed, R,angle, maxSpeed, curSpeed, 
 		}
 
 		xVel = xVel + xDir;
-               yVel = yVel + yDir;                
+                yVel = yVel + yDir;                
                 
-                float xPos = (i * tileSize.x) + (xVel * .01);
-                float yPos = (j * tileSize.y) + (yVel * .01);
+                xPos = (i * tileSize.x) + (xVel * .01);
+                yPos = (j * tileSize.y) + (yVel * .01);
                 float xSize = ((i + 1) * tileSize.x) + (xVel * .01);
                 float ySize = ((j + 1) * tileSize.y) + (yVel * .01);
                 quad[0].position = sf::Vector2f(xPos, yPos);
@@ -236,6 +205,33 @@ private:
     sf::Texture m_tileset;
 };
 
+class Station: public Entity
+{
+    public:
+    string name;
+    std::list<Quest*> quests;
+    std::list<ShopGood*> shopGoods;
+    Port port;
+    
+    void createStation(Sprite &Image,int X,int Y, int W, int H, string Name, std::list<Quest*> Quests, std::list<ShopGood*> ShopGoods, Port ThisPort)
+    {
+        port = ThisPort;
+        shopGoods = ShopGoods;
+        quests = Quests;
+        name = Name;
+        sprite = Image;
+        x=X; y=Y;
+        w = W; h = H;
+    }
+   
+   void updatePos(TileMap *m)
+   {
+       x = m->xVel * (.01);
+       y = m->yVel * (.01);
+   
+   }
+};
+
 class player: public Entity
 {
    public:
@@ -252,8 +248,6 @@ class player: public Entity
         xPos = m->xVel + 600;
         yPos = m->yVel + 400;   
     }
-
-
 };
 
 class bullet: public Entity
@@ -287,12 +281,22 @@ void drawText( const sf::String &str, const int Size, const float xposition, con
     window.draw(source);
 }
 
-std::vector<Sprite> addSpriteToList(std::vector<Sprite> spriteList, Texture t)
+std::vector<Sprite> addSpriteToList(std::vector<Sprite> spriteList, Texture *t)
 {
-    Sprite sprite(t);
+    Sprite sprite(*t);
     spriteList.push_back(sprite);
     return spriteList;
 
+}
+
+bool isCollideWithPlayer(Entity *a,Entity *b)
+{
+
+  //dimensions of 
+
+  return (b->x - a->x)*(b->x - a->x)+
+         (b->y - a->y)*(b->y - a->y)<
+         (a->R + b->R)*(a->R + b->R);
 }
 
 int main() {
@@ -317,12 +321,13 @@ int main() {
     Sprite bulletSprite(t3);
     std::vector<Sprite> stationMainSprites;
     std::vector<Sprite> stationDockSprites;
+    std::vector<Station*> stations;
     
     t4.loadFromFile("images/bluePurpleStationMain.png");
-    stationMainSprites = addSpriteToList(stationMainSprites, t4);
+    stationMainSprites = addSpriteToList(stationMainSprites, &t4);
     
-    t4.loadFromFile("images/bluePurpleStationDock.png");
-    stationDockSprites = addSpriteToList(stationDockSprites, t4);
+    t5.loadFromFile("images/bluePurpleStationDock.png");
+    stationDockSprites = addSpriteToList(stationDockSprites, &t5);
     
     const int level[] =
     {
@@ -339,7 +344,8 @@ int main() {
     entities.push_back(p);
     
     Station *station = new Station();
-    station->settings(stationMainSprites[0],600,400,600,300,0,0);
+    station->settings(stationMainSprites[0],300,400,600,300,0,0);
+    stations.push_back(station);
     
     // create the tilemap from the level definition
     TileMap *m = new TileMap();
@@ -347,19 +353,16 @@ int main() {
     if (!m->load("images/spaceTilemap.png", sf::Vector2u(1280, 1280), level, 16, 8, *p))
         return -1;
     
-    for(auto i:entities)
-    {
-    i->draw(app);
-    
-    
-    
-    } 
+    for(auto i:stations)
+        entities.push_back(i);
     
     /////main loop/////
     while (app.isOpen())
     {
-    
+        
         p->updatePos(m);
+        for(auto i:stations)
+            i->updatePos(m);
         
         Event event;
         while (app.pollEvent(event))
@@ -383,9 +386,15 @@ int main() {
     if (Keyboard::isKeyPressed(Keyboard::Left))  
         p->angle-=6;
     if (Keyboard::isKeyPressed(Keyboard::Up)) 
+    {
         m->thrust = true;
+        
+    }
     else if (Keyboard::isKeyPressed(Keyboard::Down)) 
+    {
         m->backThrust = true;
+
+    }
     else {
         m->thrust=false;
         m -> backThrust = false;
@@ -409,9 +418,14 @@ int main() {
    //app.draw(background);
    app.draw(*m);
    for(auto i:entities) i->draw(app);
-   drawText("xPos: " + std::to_string(m->xVel + 600), 20, 90, 90, app);
+   /*drawText("xPos: " + std::to_string(m->xVel + 600), 20, 90, 90, app);
    drawText("yPos: " + std::to_string(m->yVel + 400), 20, 90, 140, app);
-   drawText("Bullets Fired: " + std::to_string(bulletsFired), 20, 90, 190, app);
+   drawText("Station xPos: " + std::to_string(station -> x), 20, 90, 10, app);
+   drawText("Station yPos: " + std::to_string(station -> y), 20, 90, 40, app);*/
+   drawText("playerPos: " + std::to_string(p->sprite.getPosition().x) + " " + std::to_string(p->sprite.getPosition().y), 20, 90, 50, app);
+   drawText("playerTopL: " + std::to_string(p->sprite.getPosition().x - (p->w)/2) + " PlayerTopR: " + std::to_string(p->sprite.getPosition().y + (p->h)/2), 20, 90, 100, app);
+   drawText("stationPos " + std::to_string(station->sprite.getPosition().x) + " " + std::to_string(station->sprite.getPosition().y), 20, 90, 200, app);
+   //drawText("Bullets Fired: " + std::to_string(bulletsFired), 20, 90, 190, app);
 
    app.display();
    app.clear();
