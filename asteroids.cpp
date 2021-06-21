@@ -25,7 +25,6 @@ struct position {
   int yCoord;
 } ;
 
-
 class Entity
 {
    public:
@@ -101,10 +100,12 @@ class Port: public Entity
 
 };
 
+bool isCollide(Entity *a,Entity *b);
+
 class TileMap : public sf::Drawable, public sf::Transformable
 {
 public:
-bool thrust = false;
+bool thrust, collision, firstCollide= false;
 bool backThrust = false;
 bool beganThrust = false;
 float xVel,yVel,dx,dy, xDir, yDir, xPos, yPos, xSpeed, ySpeed, R,angle, maxSpeed, curSpeed, accelerationRate;
@@ -120,7 +121,7 @@ float xVel,yVel,dx,dy, xDir, yDir, xPos, yPos, xSpeed, ySpeed, R,angle, maxSpeed
         maxSpeed = 3.5;
     }
 
-    bool load(const std::string& tileset, sf::Vector2u tileSize, const int* tiles, unsigned int width, unsigned int height, Entity ship)
+    bool load(const std::string& tileset, sf::Vector2u tileSize, const int* tiles, unsigned int width, unsigned int height, Entity ship, std::vector<Entity*> collidableEntities)
     {
         // load the tileset texture
         if (!m_tileset.loadFromFile(tileset))
@@ -147,22 +148,38 @@ float xVel,yVel,dx,dy, xDir, yDir, xPos, yPos, xSpeed, ySpeed, R,angle, maxSpeed
                 // define its 4 corners 
                                
 	        curSpeed = sqrt((xDir*xDir) + (yDir*yDir));
+	        
+	        for(auto i:collidableEntities)
+	        {
+                    if (isCollide(&ship, i))
+                    {
+                        collision =  true;
+                        break;
+                    }
+                    
+                    collision = false;
+                    firstCollide = false;
+                }
                 
-                if (thrust)
+                if (thrust and !collision)
 	        {
 	            xDir += cos((ship.getAngle() + 90) * PI/180) * 0.001;
                     yDir += sin((ship.getAngle() + 90) * PI/180) * 0.001;
 	            if (curSpeed > maxSpeed){
 	                xDir *= maxSpeed/curSpeed;
 	                yDir *= maxSpeed/curSpeed;}
-		}
-		
-		else if (backThrust)
-		{
+		} else if (backThrust and !collision) {
 		    if (curSpeed > 0){
 	                xDir *= 0.999;
 	                yDir *= 0.999;}
 		
+		} else if (collision and firstCollide == false) {
+		    //xVel = xVel - (xDir);
+                   //yVel = yVel - (yDir); 
+                   xDir = -xDir * .5;
+                   yDir = -yDir * .5;
+                   firstCollide = true;
+
 		}
 
 		xVel = xVel + xDir;
@@ -340,6 +357,7 @@ int main() {
     std::vector<Sprite> stationMainSprites;
     std::vector<Sprite> stationDockSprites;
     std::vector<Station*> stations;
+    std::vector<Entity*> collidableEntities;
     
     t4.loadFromFile("images/bluePurpleStationMain.png");
     stationMainSprites = addSpriteToList(stationMainSprites, &t4);
@@ -357,22 +375,23 @@ int main() {
     
     std::list<Entity*> entities;
     
+    Station *station = new Station();
+    station->settings(stationMainSprites[0],300,400,600,300,0,0);
+    stations.push_back(station);
+    collidableEntities.push_back(station);
+    
+    for(auto i:stations)
+        entities.push_back(i);
+        
     player *p = new player();
     p->settings(playerShip,600,400,32,33,0,20);
     entities.push_back(p);
     
-    Station *station = new Station();
-    station->settings(stationMainSprites[0],300,400,600,300,0,0);
-    stations.push_back(station);
-    
     // create the tilemap from the level definition
     TileMap *m = new TileMap();
     m->resetMap();
-    if (!m->load("images/spaceTilemap.png", sf::Vector2u(1280, 1280), level, 16, 8, *p))
+    if (!m->load("images/spaceTilemap.png", sf::Vector2u(1280, 1280), level, 16, 8, *p, collidableEntities))
         return -1;
-    
-    for(auto i:stations)
-        entities.push_back(i);
     
     /////main loop/////
     while (app.isOpen())
@@ -418,7 +437,7 @@ int main() {
         m -> backThrust = false;
     }
         
-    m->load("images/spaceTilemap.png", sf::Vector2u(1280, 1280), level, 16, 8, *p);
+    m->load("images/spaceTilemap.png", sf::Vector2u(1280, 1280), level, 16, 8, *p, collidableEntities);
 
     for(auto i=entities.begin();i!=entities.end();)
     {
@@ -436,17 +455,18 @@ int main() {
    //app.draw(background);
    app.draw(*m);
    for(auto i:entities) i->draw(app);
-   /*drawText("xPos: " + std::to_string(m->xVel + 600), 20, 90, 90, app);
-   drawText("yPos: " + std::to_string(m->yVel + 400), 20, 90, 140, app);
-   drawText("Station xPos: " + std::to_string(station -> x), 20, 90, 10, app);
-   drawText("Station yPos: " + std::to_string(station -> y), 20, 90, 40, app);*/
+   drawText("Is colliding: " + std::to_string(m->collision), 20, 90, 90, app);
+   drawText("xDir: " + std::to_string(m->xDir), 20, 90, 140, app);
+   drawText("yDir: " + std::to_string(m->yDir), 20, 90, 190, app);
+   //drawText("Station xPos: " + std::to_string(station -> x), 20, 90, 10, app);
+   //drawText("Station yPos: " + std::to_string(station -> y), 20, 90, 40, app);*/
    //drawText("playerPos: " + std::to_string(p->sprite.getPosition().x) + " " + std::to_string(p->sprite.getPosition().y), 20, 90, 50, app);
-   drawText("playerTopL: " + std::to_string(p->sprite.getPosition().x - (p->w)/2) + ", " + std::to_string(p->sprite.getPosition().y + (p->h)/2), 20, 90, 100, app);
-   drawText("playerBottomR: " + std::to_string(p->sprite.getPosition().x + (p->w)/2) + ", " + std::to_string(p->sprite.getPosition().y - (p->h)/2), 20, 90, 150, app);
+   //drawText("playerTopL: " + std::to_string(p->sprite.getPosition().x - (p->w)/2) + ", " + std::to_string(p->sprite.getPosition().y + (p->h)/2), 20, 90, 100, app);
+   //drawText("playerBottomR: " + std::to_string(p->sprite.getPosition().x + (p->w)/2) + ", " + std::to_string(p->sprite.getPosition().y - (p->h)/2), 20, 90, 150, app);
    //drawText("stationPos " + std::to_string(station->sprite.getPosition().x) + " " + std::to_string(station->sprite.getPosition().y), 20, 90, 200, app);
-   drawText("stationTopL " + std::to_string(station->sprite.getPosition().x - (station->w)/2) + ", " + std::to_string(station->sprite.getPosition().y + (station->h)/2), 20, 90, 250, app);
-   drawText("stationBottomR " + std::to_string(station->sprite.getPosition().x + (station->w)/2) + ", " + std::to_string(station->sprite.getPosition().y - (station->h)/2), 20, 90, 300, app);
-   drawText("Overlapping " + std::to_string(isCollide(p, station)), 20, 90, 50, app);
+   //drawText("stationTopL " + std::to_string(station->sprite.getPosition().x - (station->w)/2) + ", " + std::to_string(station->sprite.getPosition().y + (station->h)/2), 20, 90, 250, app);
+   //drawText("stationBottomR " + std::to_string(station->sprite.getPosition().x + (station->w)/2) + ", " + std::to_string(station->sprite.getPosition().y - (station->h)/2), 20, 90, 300, app);
+   //drawText("Overlapping " + std::to_string(isCollide(p, station)), 20, 90, 50, app);
    
 
    app.display();
