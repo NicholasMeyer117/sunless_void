@@ -5,6 +5,7 @@
 #include <time.h>
 #include <list>
 #include <math.h>
+#include <cstring>
 #define PI 3.14159265
 
 using namespace sf;
@@ -28,7 +29,7 @@ struct position {
 class Entity
 {
    public:
-   float x,y,w,h,dx,dy,R,angle;
+   float x,y,xPos,yPos,w,h,dx,dy,R,angle;
    float absAngle;
    bool life;
    std::string name;
@@ -39,13 +40,14 @@ class Entity
      life=1;
    }
    
-   void settings(Sprite &a,int X,int Y, int W, int H, float Angle=0,int radius=1)
+   void settings(Sprite &a,float X,float Y, float W, float H, float Angle=0,int radius=1)
    {
      sprite = a;
-     x=X; y=Y;
+     x=X; y=Y; //current ever-changing position relative to window
      angle = Angle;
      R = radius;
      w = W; h = H;
+     xPos = X, yPos = Y; //static original position on the map
    }
    
    float getAngle()
@@ -68,6 +70,7 @@ class Entity
      circle.setPosition(x,y);
      circle.setOrigin(R,R);
      //app.draw(circle);
+     
    }
 
    virtual ~Entity(){};
@@ -109,6 +112,7 @@ bool thrust, collision, firstCollide= false;
 bool backThrust = false;
 bool beganThrust = false;
 float xVel,yVel,dx,dy, xDir, yDir, xPos, yPos, xSpeed, ySpeed, R,angle, maxSpeed, curSpeed, accelerationRate;
+int tileArray[400];
 
     void resetMap()
     {
@@ -123,6 +127,8 @@ float xVel,yVel,dx,dy, xDir, yDir, xPos, yPos, xSpeed, ySpeed, R,angle, maxSpeed
 
     bool load(const std::string& tileset, sf::Vector2u tileSize, const int* tiles, unsigned int width, unsigned int height, Entity ship, std::vector<Entity*> collidableEntities)
     {
+        
+        memcpy(tileArray, tiles, sizeof(tileArray));
         // load the tileset texture
         if (!m_tileset.loadFromFile(tileset))
             return false;
@@ -155,10 +161,10 @@ float xVel,yVel,dx,dy, xDir, yDir, xPos, yPos, xSpeed, ySpeed, R,angle, maxSpeed
                     {
                         collision =  true;
                         break;
+                    } else if (i == collidableEntities.back()) {
+                        collision = false;
+                        firstCollide = false;
                     }
-                    
-                    collision = false;
-                    firstCollide = false;
                 }
                 
                 if (thrust and !collision)
@@ -174,15 +180,13 @@ float xVel,yVel,dx,dy, xDir, yDir, xPos, yPos, xSpeed, ySpeed, R,angle, maxSpeed
 	                yDir *= 0.999;}
 		
 		} else if (collision and firstCollide == false) {
-		    //xVel = xVel - (xDir);
-                   //yVel = yVel - (yDir); 
                    xDir = -xDir * .5;
                    yDir = -yDir * .5;
                    firstCollide = true;
 
 		}
 
-		xVel = xVel + xDir;
+                xVel = xVel + xDir;
                 yVel = yVel + yDir;                
                 
                 xPos = (i * tileSize.x) + (xVel * .01);
@@ -222,30 +226,101 @@ private:
     sf::Texture m_tileset;
 };
 
+class Minimap
+{
+    public:
+    std::string tilemap;
+    sf::RectangleShape rectangle;
+    sf::CircleShape playerIcon;
+    std::vector<RectangleShape> tileRectangles;
+    int map[400];
+
+    
+    void createMinimap(int mapArray[], float xDim, float yDim, float xPos, float yPos)
+    {
+    
+    rectangle.setSize(sf::Vector2f(xDim, yDim));
+    rectangle.setOutlineColor(sf::Color::Black);
+    rectangle.setOutlineThickness(5);
+    rectangle.setOrigin(xDim/2, yDim/2);
+    rectangle.setPosition(xPos, yPos);
+    memcpy(map, mapArray, sizeof(map));
+    
+    playerIcon.setRadius(10);
+    playerIcon.setPointCount(3);
+    playerIcon.setFillColor(sf::Color::Red);
+    playerIcon.setOutlineThickness(0);
+    playerIcon.setOrigin(10, 10);
+    playerIcon.setPosition(xPos, yPos);
+    
+    int tileNum = 0;
+    int tileDim = xDim/20;
+    for (auto i = 0; i < 20; i++)
+        for (auto j = 0; j < 20; j++)
+        {
+            addTile(xPos - (i * tileDim),yPos - (j * tileDim), tileDim, tileNum, xDim, yDim);
+            tileNum++;
+        }
+    
+    
+    }
+    
+    void addTile(int xTile, int yTile, int dim, int num, int mapXPos, int mapDim)
+    {
+        sf::RectangleShape tileRectangle;
+        tileRectangle.setSize(sf::Vector2f(dim, dim));
+        tileRectangle.setOutlineColor(sf::Color::Black);
+        tileRectangle.setOutlineThickness(1);
+        tileRectangle.setOrigin(dim, dim);
+        tileRectangle.setPosition(xTile + mapXPos/2, yTile + mapDim/2);
+        tileRectangles.push_back(tileRectangle);
+    }
+    
+    void updateMinimap(TileMap tilemap, Entity ship)
+    {
+        
+        //playerIcon.move((tilemap.xVel*.0025), (tilemap.yVel*.0025));
+        playerIcon.setRotation(ship.getAngle());
+        playerIcon.setPosition(600 + (tilemap.xVel*-.001), 400 + (tilemap.yVel*-.001));
+    }
+
+};
+
 class Station: public Entity
 {
     public:
     string name;
-    std::list<Quest*> quests;
-    std::list<ShopGood*> shopGoods;
+    std::vector<Quest*> quests;
+    std::vector<ShopGood*> shopGoods;
+    std::vector<Entity*> docks;
     Port port;
     
-    void createStation(Sprite &Image,int X,int Y, int W, int H, string Name, std::list<Quest*> Quests, std::list<ShopGood*> ShopGoods, Port ThisPort)
+    void createStation(string Name, std::vector<Quest*> Quests, std::vector<ShopGood*> ShopGoods, Port ThisPort)
     {
         port = ThisPort;
         shopGoods = ShopGoods;
         quests = Quests;
         name = Name;
-        sprite = Image;
-        x=X; y=Y;
-        w = W; h = H;
     }
    
    void updatePos(TileMap *m)
    {
-       x = m->xVel * (.01);
-       y = m->yVel * (.01);
+       x = (m->xVel * .01) + xPos;
+       y = (m->yVel * .01) + yPos;
+       docks[0]->x = (m->xVel * .01) + docks[0] -> xPos;
+       docks[0]->y = (m->yVel * .01) + docks[0] -> yPos;
+       docks[1]->x = (m->xVel * .01) + docks[1] -> xPos;
+       docks[1]->y = (m->yVel * .01) + docks[1] -> yPos;
+   }
    
+   void addDockSprites(Sprite dockSprite)
+   {
+       Entity *dock1 = new Entity();
+       dock1->settings(dockSprite,xPos - 50,yPos + 200 ,30,150,0,0);
+       docks.push_back(dock1);
+       Entity *dock2 = new Entity();
+       dock2->settings(dockSprite,xPos + 50,yPos + 200 ,30,150,0,0);
+       docks.push_back(dock2);
    }
 };
 
@@ -253,7 +328,6 @@ class player: public Entity
 {
    public:
    bool thrust;
-   int xPos, yPos;
 
    player()
    {
@@ -262,8 +336,9 @@ class player: public Entity
    
    void updatePos(TileMap *m)
     {
-        xPos = m->xVel + 600;
-        yPos = m->yVel + 400;   
+        xPos = (m->xVel * .01) + 600;
+        yPos = (m->yVel * .01) + 400;
+        
     }
 };
 
@@ -365,23 +440,51 @@ int main() {
     t5.loadFromFile("images/bluePurpleStationDock.png");
     stationDockSprites = addSpriteToList(stationDockSprites, &t5);
     
-    const int level[] =
+    int level[] =
     {
-        2, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        0, 1, 3, 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
+        0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1,
+        0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
+        0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1,
+        0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
+        0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1,
+        0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
+        0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1,
+        0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
+        0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1,
+        0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
+        0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1,
+        0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
+        0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1,
+        0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
+        0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1,
+        0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
+        0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1,
+        0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
+        0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1,
     };
     
     int bulletsFired = 0;
+    bool mapOpen = false;
     
     std::list<Entity*> entities;
     
     Station *station = new Station();
-    station->settings(stationMainSprites[0],300,400,600,300,0,0);
+    station->settings(stationMainSprites[0],300,200,600,300,0,0);
     stations.push_back(station);
-    collidableEntities.push_back(station);
+    station->addDockSprites(stationDockSprites[0]);
     
-    for(auto i:stations)
+    for(auto i:stations) {
         entities.push_back(i);
+        entities.push_back(i -> docks[0]);
+        entities.push_back(i -> docks[1]);
+    }
+    
+    for(auto i:stations) {
+        collidableEntities.push_back(i);
+        collidableEntities.push_back(i -> docks[0]);
+        collidableEntities.push_back(i -> docks[1]);
+    }
         
     player *p = new player();
     p->settings(playerShip,600,400,32,33,0,20);
@@ -390,8 +493,11 @@ int main() {
     // create the tilemap from the level definition
     TileMap *m = new TileMap();
     m->resetMap();
-    if (!m->load("images/spaceTilemap.png", sf::Vector2u(1280, 1280), level, 16, 8, *p, collidableEntities))
+    if (!m->load("images/spaceTilemap.png", sf::Vector2u(1280, 1280), level, 20, 20, *p, collidableEntities))
         return -1;
+        
+    Minimap *minimap = new Minimap();
+    minimap -> createMinimap(level,700,700,600,400);
     
     /////main loop/////
     while (app.isOpen())
@@ -423,21 +529,23 @@ int main() {
     if (Keyboard::isKeyPressed(Keyboard::Left))  
         p->angle-=6;
     if (Keyboard::isKeyPressed(Keyboard::Up)) 
-    {
         m->thrust = true;
-        
-    }
     else if (Keyboard::isKeyPressed(Keyboard::Down)) 
-    {
         m->backThrust = true;
-
-    }
     else {
         m->thrust=false;
         m -> backThrust = false;
     }
+    
+    if (Keyboard::isKeyPressed(Keyboard::M)) 
+    {
+        if (mapOpen)
+            mapOpen = false;
+        else
+            mapOpen = true;
+    }
         
-    m->load("images/spaceTilemap.png", sf::Vector2u(1280, 1280), level, 16, 8, *p, collidableEntities);
+    m->load("images/spaceTilemap.png", sf::Vector2u(1280, 1280), level, 10, 10, *p, collidableEntities);
 
     for(auto i=entities.begin();i!=entities.end();)
     {
@@ -455,12 +563,22 @@ int main() {
    //app.draw(background);
    app.draw(*m);
    for(auto i:entities) i->draw(app);
-   drawText("Is colliding: " + std::to_string(m->collision), 20, 90, 90, app);
-   drawText("xDir: " + std::to_string(m->xDir), 20, 90, 140, app);
-   drawText("yDir: " + std::to_string(m->yDir), 20, 90, 190, app);
-   //drawText("Station xPos: " + std::to_string(station -> x), 20, 90, 10, app);
-   //drawText("Station yPos: " + std::to_string(station -> y), 20, 90, 40, app);*/
-   //drawText("playerPos: " + std::to_string(p->sprite.getPosition().x) + " " + std::to_string(p->sprite.getPosition().y), 20, 90, 50, app);
+   
+   if (mapOpen){
+       minimap->updateMinimap(*m, *p);
+       app.draw(minimap -> rectangle);
+       for(auto i:(minimap -> tileRectangles)) app.draw(i);
+       app.draw(minimap->playerIcon);
+   }
+   
+   drawText("First Tile Pos: " + std::to_string(minimap->tileRectangles[0].getPosition().y), 20, 90, 70, app);
+   drawText("Player Position: " + std::to_string(p->xPos) + ", " + std::to_string(p->yPos), 20, 90, 140, app);
+   drawText("Icon Position: " + std::to_string(minimap->playerIcon.getPosition().x) + ", " + std::to_string(minimap->playerIcon.getPosition().y), 20, 90, 190, app);
+   //drawText("xDir: " + std::to_string(m->xDir), 20, 90, 140, app);
+   //drawText("yDir: " + std::to_string(m->yDir), 20, 90, 190, app);
+   //drawText("Station xPos: " + std::to_string(station -> docks[0] -> x), 20, 90, 10, app);
+   //drawText("Station yPos: " + std::to_string(station -> docks[0] -> y), 20, 90, 40, app);
+   //drawText("playerPos: " + std::to_string(p->sprite.getPosition().x) + " " + std::to_string(p->sprite.getPosition().y), 20, 90, 100, app);
    //drawText("playerTopL: " + std::to_string(p->sprite.getPosition().x - (p->w)/2) + ", " + std::to_string(p->sprite.getPosition().y + (p->h)/2), 20, 90, 100, app);
    //drawText("playerBottomR: " + std::to_string(p->sprite.getPosition().x + (p->w)/2) + ", " + std::to_string(p->sprite.getPosition().y - (p->h)/2), 20, 90, 150, app);
    //drawText("stationPos " + std::to_string(station->sprite.getPosition().x) + " " + std::to_string(station->sprite.getPosition().y), 20, 90, 200, app);
