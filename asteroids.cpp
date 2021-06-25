@@ -6,6 +6,7 @@
 #include <list>
 #include <math.h>
 #include <cstring>
+#include "Entity.h"
 #define PI 3.14159265
 
 using namespace sf;
@@ -25,56 +26,6 @@ struct position {
   int xCoord;
   int yCoord;
 } ;
-
-class Entity
-{
-   public:
-   float x,y,xPos,yPos,w,h,dx,dy,R,angle;
-   float absAngle;
-   bool life;
-   std::string name;
-   Sprite sprite;
-
-   Entity()
-   {
-     life=1;
-   }
-   
-   void settings(Sprite &a,float X,float Y, float W, float H, float Angle=0,int radius=1)
-   {
-     sprite = a;
-     x=X; y=Y; //current ever-changing position relative to window
-     angle = Angle;
-     R = radius;
-     w = W; h = H;
-     xPos = X, yPos = Y; //static original position on the map
-   }
-   
-   float getAngle()
-   {
-       return absAngle;
-   }
-
-   virtual void update(){};
-
-   void draw(RenderWindow &app)
-   {
-     sprite.setOrigin(w/2,h/2);
-     sprite.setPosition(x,y);
-     sprite.setRotation(angle);
-     app.draw(sprite);
-     absAngle = sprite.getRotation();
-
-     CircleShape circle(R);
-     circle.setFillColor(Color(255,0,0,170));
-     circle.setPosition(x,y);
-     circle.setOrigin(R,R);
-     //app.draw(circle);
-     
-   }
-
-   virtual ~Entity(){};
-};
 
 class Quest
 {
@@ -522,7 +473,6 @@ int main() {
                 bulletsFired++;
               }
         }
-        
 
     if (Keyboard::isKeyPressed(Keyboard::Right)) 
         p->angle+=6;
@@ -589,7 +539,7 @@ int main() {
 
    app.display();
    app.clear();
-    }
+   }
     
     return 0;
 }
