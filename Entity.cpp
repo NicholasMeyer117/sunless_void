@@ -10,10 +10,38 @@
      xPos = X, yPos = Y; //static original position on the map
    }
    
-   float Entity:: getAngle()
+   float Entity::getAngle()
    {
        return absAngle;
    }
+
+   bool Entity::isCollide(Entity *a,Entity *b)
+   {
+
+   //dimensions of 
+
+      Vector2f al, ar, bl, br;
+      al.x = (a->sprite.getPosition().x - (a->w)/2);
+      al.y = (a->sprite.getPosition().y + (a->h)/2);
+    
+      ar.x = (a->sprite.getPosition().x + (a->w)/2);
+      ar.y = (a->sprite.getPosition().y - (a->h)/2);
+    
+      bl.x = (b->sprite.getPosition().x - (b->w)/2);
+      bl.y = (b->sprite.getPosition().y + (b->h)/2);
+    
+      br.x = (b->sprite.getPosition().x + (b->w)/2);
+      br.y = (b->sprite.getPosition().y - (b->h)/2);
+    
+      // If one rectangle is on left side of other
+      if (al.x >= br.x or bl.x >= ar.x)
+         return false;
+      // If one rectangle is above other
+      if (al.y <= br.y or bl.y <= ar.y)
+         return false;
+      else
+         return true;
+}
 
    void Entity::update(){}
 

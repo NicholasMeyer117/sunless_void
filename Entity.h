@@ -25,6 +25,8 @@ class Entity
    
    float getAngle();
    
+   bool isCollide(Entity *a,Entity *b);
+   
    virtual void update();
 
    void draw(RenderWindow &app);
